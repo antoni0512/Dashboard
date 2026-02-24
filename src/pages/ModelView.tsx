@@ -92,37 +92,50 @@ const ModelView = () => {
     fetchFiles();
   }, [modelType]);
 
-  // Unique release dates for dropdown
+  // Unique release dates for dropdown, filtered by selected build
   const releaseDates = useMemo(() => {
     const dates = new Set<string>();
-    files.forEach((f) => {
-      if (f.release_date) {
-        dates.add(f.release_date);
-      }
-    });
+    files
+      .filter((f) => !selectedBuild || f.build_type === selectedBuild)
+      .forEach((f) => {
+        if (f.release_date) {
+          dates.add(f.release_date);
+        }
+      });
     return Array.from(dates).sort().reverse();
-  }, [files]);
+  }, [files, selectedBuild]);
+
+  // Sync selectedDate when build changes or data loads
+  useEffect(() => {
+    if (releaseDates.length > 0) {
+      if (!selectedDate || !releaseDates.includes(selectedDate)) {
+        setSelectedDate(releaseDates[0]);
+      }
+    } else {
+      setSelectedDate("");
+    }
+  }, [releaseDates, selectedDate]);
 
   // Filtered files by build + date
   const filteredFiles = useMemo(() => {
-    let result = files;
-    if (selectedBuild) result = result.filter((f) => f.build_type === selectedBuild);
-    if (selectedDate) {
-      result = result.filter((f) => f.release_date === selectedDate);
-    }
-    return result;
+    return files.filter(
+      (f) =>
+        (!selectedBuild || f.build_type === selectedBuild) &&
+        (!selectedDate || f.release_date === selectedDate)
+    );
   }, [files, selectedBuild, selectedDate]);
 
-  // When filters change, select first matching file
+  // When filtered files list changes, select the specific file
   useEffect(() => {
     if (filteredFiles.length > 0) {
+      // If current selected id is not in filtered list, pick the first one
       if (!filteredFiles.find((f) => f.id === selectedFileId)) {
         setSelectedFileId(filteredFiles[0].id);
       }
     } else {
       setSelectedFileId("");
     }
-  }, [filteredFiles]);
+  }, [filteredFiles, selectedFileId]);
 
   // Fetch sheets when file changes
   useEffect(() => {
@@ -228,12 +241,12 @@ const ModelView = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">{modelType}</h1>
-            <p className="text-muted-foreground mt-1">
+            {/* <p className="text-muted-foreground mt-1">
               {filteredFiles.length} file(s)
               {selectedFile?.release_date && (
                 <> · Release Date: {new Date(selectedFile.release_date).toLocaleDateString()}</>
               )}
-            </p>
+            </p> */}
           </div>
           {hasEdits && (
             <Button onClick={handleSaveEdits} disabled={saving}>
