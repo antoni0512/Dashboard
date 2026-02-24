@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/lib/apiClient";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload as UploadIcon, FileSpreadsheet, X, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -13,38 +14,15 @@ const MODEL_TYPES = ["BOM Diff", "AAS BOM Diff"];
 
 const BUILD_TYPES = ["KB Release", "Skinny Release"];
 
-// Generate week options: current week + next 4 weeks
-const generateWeekOptions = () => {
-  const weeks: { value: string; label: string }[] = [];
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-  start.setHours(0, 0, 0, 0);
-
-  for (let i = -2; i <= 4; i++) {
-    const weekStart = new Date(start);
-    weekStart.setDate(start.getDate() + i * 7);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    weeks.push({
-      value: format(weekStart, "yyyy-MM-dd"),
-      label: `${format(weekStart, "MMM d")} – ${format(weekEnd, "MMM d, yyyy")}`,
-    });
-  }
-  return weeks;
-};
-
 const UploadPage = () => {
   const [file, setFile] = useState<File | null>(null);
   const [modelType, setModelType] = useState("");
   const [buildType, setBuildType] = useState("");
-  const [releaseWeek, setReleaseWeek] = useState("");
+  const [releaseDate, setReleaseDate] = useState("");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const weekOptions = generateWeekOptions();
 
   const handleFile = useCallback((f: File) => {
     const ext = f.name.split(".").pop()?.toLowerCase();
@@ -79,7 +57,7 @@ const UploadPage = () => {
           file_name: file.name,
           model_type: modelType,
           build_type: buildType,
-          release_date: releaseWeek || null,
+          release_date: releaseDate || null,
           sheet_names: sheetNames,
         })
         .select()
@@ -150,19 +128,15 @@ const UploadPage = () => {
             </Select>
           </div>
 
-          {/* Release Week */}
+          {/* Release Date */}
           <div>
-            <label className="text-sm font-medium mb-2 block">Release Week</label>
-            <Select value={releaseWeek} onValueChange={setReleaseWeek}>
-              <SelectTrigger className="w-full bg-card">
-                <SelectValue placeholder="Select release week..." />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                {weekOptions.map((w) => (
-                  <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-sm font-medium mb-2 block">Release Date</label>
+            <Input
+              type="date"
+              value={releaseDate}
+              onChange={(e) => setReleaseDate(e.target.value)}
+              className="w-full bg-card h-10 px-3 py-2"
+            />
           </div>
 
           {/* File Drop Zone */}

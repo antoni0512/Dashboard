@@ -49,8 +49,8 @@ const ModelView = () => {
   const modelType = SLUG_TO_MODEL[slug || ""] || slug || "";
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedFileId, setSelectedFileId] = useState("");
-  const [selectedBuild, setSelectedBuild] = useState("all");
-  const [selectedWeek, setSelectedWeek] = useState("all");
+  const [selectedBuild, setSelectedBuild] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [sheets, setSheets] = useState<SheetData[]>([]);
   const [selectedSheet, setSelectedSheet] = useState("");
   const [editedCells, setEditedCells] = useState<Record<string, string>>({});
@@ -73,9 +73,16 @@ const ModelView = () => {
       }
       if (data && data.length > 0) {
         setFiles(data);
+        // Initial defaults
+        const firstBuild = data[0].build_type;
+        const firstDate = data[0].release_date || "";
+        setSelectedBuild(firstBuild);
+        setSelectedDate(firstDate);
         setSelectedFileId(data[0].id);
       } else {
         setFiles([]);
+        setSelectedBuild("");
+        setSelectedDate("");
         setSelectedFileId("");
         setSheets([]);
         setSelectedSheet("");
@@ -85,35 +92,26 @@ const ModelView = () => {
     fetchFiles();
   }, [modelType]);
 
-  // Unique release weeks for dropdown
-  const releaseWeeks = useMemo(() => {
-    const weeks = new Set<string>();
+  // Unique release dates for dropdown
+  const releaseDates = useMemo(() => {
+    const dates = new Set<string>();
     files.forEach((f) => {
       if (f.release_date) {
-        const d = new Date(f.release_date);
-        const start = new Date(d);
-        start.setDate(d.getDate() - d.getDay());
-        weeks.add(start.toISOString().split("T")[0]);
+        dates.add(f.release_date);
       }
     });
-    return Array.from(weeks).sort().reverse();
+    return Array.from(dates).sort().reverse();
   }, [files]);
 
-  // Filtered files by build + week
+  // Filtered files by build + date
   const filteredFiles = useMemo(() => {
     let result = files;
-    if (selectedBuild !== "all") result = result.filter((f) => f.build_type === selectedBuild);
-    if (selectedWeek !== "all") {
-      result = result.filter((f) => {
-        if (!f.release_date) return false;
-        const d = new Date(f.release_date);
-        const start = new Date(d);
-        start.setDate(d.getDate() - d.getDay());
-        return start.toISOString().split("T")[0] === selectedWeek;
-      });
+    if (selectedBuild) result = result.filter((f) => f.build_type === selectedBuild);
+    if (selectedDate) {
+      result = result.filter((f) => f.release_date === selectedDate);
     }
     return result;
-  }, [files, selectedBuild, selectedWeek]);
+  }, [files, selectedBuild, selectedDate]);
 
   // When filters change, select first matching file
   useEffect(() => {
@@ -229,7 +227,7 @@ const ModelView = () => {
             <p className="text-muted-foreground mt-1">
               {filteredFiles.length} file(s)
               {selectedFile?.release_date && (
-                <> · Release: {new Date(selectedFile.release_date).toLocaleDateString()}</>
+                <> · Release Date: {new Date(selectedFile.release_date).toLocaleDateString()}</>
               )}
             </p>
           </div>
@@ -250,7 +248,6 @@ const ModelView = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
-                <SelectItem value="all">All Builds</SelectItem>
                 <SelectItem value="KB Release">KB Release</SelectItem>
                 <SelectItem value="Skinny Release">Skinny Release</SelectItem>
               </SelectContent>
@@ -258,23 +255,17 @@ const ModelView = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Release Week:</label>
-            <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+            <label className="text-sm font-medium">Release Date:</label>
+            <Select value={selectedDate} onValueChange={setSelectedDate}>
               <SelectTrigger className="w-48 bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
-                <SelectItem value="all">All Weeks</SelectItem>
-                {releaseWeeks.map((w) => {
-                  const d = new Date(w);
-                  const end = new Date(d);
-                  end.setDate(d.getDate() + 6);
-                  return (
-                    <SelectItem key={w} value={w}>
-                      {d.toLocaleDateString()} – {end.toLocaleDateString()}
-                    </SelectItem>
-                  );
-                })}
+                {releaseDates.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {new Date(d).toLocaleDateString()}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
