@@ -115,8 +115,12 @@ const ModelView = () => {
 
   // When filters change, select first matching file
   useEffect(() => {
-    if (filteredFiles.length > 0 && !filteredFiles.find((f) => f.id === selectedFileId)) {
-      setSelectedFileId(filteredFiles[0].id);
+    if (filteredFiles.length > 0) {
+      if (!filteredFiles.find((f) => f.id === selectedFileId)) {
+        setSelectedFileId(filteredFiles[0].id);
+      }
+    } else {
+      setSelectedFileId("");
     }
   }, [filteredFiles]);
 
