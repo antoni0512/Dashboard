@@ -89,8 +89,15 @@ const UploadPage = () => {
 
       for (const sheetName of sheetNames) {
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { range: 3, defval: "" });
         const headers = jsonData.length > 0 ? Object.keys(jsonData[0]) : [];
+
+        const insertData = {
+          file_id: fileRecord.id,
+          sheet_name: sheetName,
+          headers: headers,
+          data: jsonData,
+        };
 
         const { error: sheetError } = await supabase.from("regression_sheets").insert([insertData]);
         if (sheetError) throw sheetError;
