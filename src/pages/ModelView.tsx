@@ -24,6 +24,8 @@ const EDITABLE_COLUMNS = [
   "ke comments",
   "KB Go No Go",
   "kb go no go",
+  "Skinny Validation Needed",
+  "skinny validation needed",
 ];
 
 const isEditableColumn = (header: string) =>
@@ -56,6 +58,8 @@ const ModelView = () => {
   const [editedCells, setEditedCells] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [productFamilyFilter, setProductFamilyFilter] = useState("All");
+  const [scrumLeadFilter, setScrumLeadFilter] = useState("All");
   const { toast } = useToast();
 
   // Fetch files for this model type
@@ -172,10 +176,83 @@ const ModelView = () => {
     return key in editedCells ? editedCells[key] : String(original ?? "");
   };
 
+  const productFamilyOptions = useMemo(() => {
+    if (!currentSheet) return ["All"];
+    const options = new Set<string>(["All"]);
+    currentSheet.data.forEach((row) => {
+      const val = String(row["Product Family"] || row["product family"] || "");
+      if (val) options.add(val);
+    });
+    return Array.from(options);
+  }, [currentSheet]);
+
+  const scrumLeadOptions = useMemo(() => {
+    if (!currentSheet) return ["All"];
+    const options = new Set<string>(["All"]);
+    currentSheet.data.forEach((row) => {
+      const val = String(row["Scrum Lead"] || row["scrum lead"] || "");
+      if (val) options.add(val);
+    });
+    return Array.from(options);
+  }, [currentSheet]);
+
+  const filteredData = useMemo(() => {
+    if (!currentSheet) return [];
+    return currentSheet.data.filter((row) => {
+      const family = String(row["Product Family"] || row["product family"] || "");
+      const lead = String(row["Scrum Lead"] || row["scrum lead"] || "");
+      const matchFamily = productFamilyFilter === "All" || family === productFamilyFilter;
+      const matchLead = scrumLeadFilter === "All" || lead === scrumLeadFilter;
+      return matchFamily && matchLead;
+    });
+  }, [currentSheet, productFamilyFilter, scrumLeadFilter]);
+
+  const displayHeaders = useMemo(() => {
+    if (!currentSheet) return [];
+    let headers = [...currentSheet.headers];
+
+    // Ensure Scrum Lead is between UCID and KE Comments
+    const ucidIdx = headers.findIndex(h => h.toUpperCase() === "UCID");
+    const scrumLeadIdx = headers.findIndex(h => h.toLowerCase() === "scrum lead");
+
+    if (ucidIdx !== -1 && scrumLeadIdx !== -1) {
+      const lead = headers.splice(scrumLeadIdx, 1)[0];
+      const newUcidIdx = headers.findIndex(h => h.toUpperCase() === "UCID");
+      headers.splice(newUcidIdx + 1, 0, lead);
+    }
+
+    return headers;
+  }, [currentSheet]);
+
+  const kbVersion = useMemo(() => {
+    if (!currentSheet || currentSheet.data.length === 0) return "";
+    return String(currentSheet.data[0]["KB-version"] || currentSheet.data[0]["kb-version"] || "");
+  }, [currentSheet]);
+
+  const ucidsAffected = useMemo(() => {
+    if (!currentSheet || currentSheet.data.length === 0) return "";
+    return String(currentSheet.data[0]["UCIDs affected"] || currentSheet.data[0]["ucids affected"] || "");
+  }, [currentSheet]);
+
   const hasEdits = Object.keys(editedCells).length > 0;
 
   const handleSaveEdits = async () => {
     if (!currentSheet || !hasEdits) return;
+
+    // Mandatory field validation
+    const mandatoryFields = ["KE Comments (Related ALM/PERT ID)", "KE Comments (Related ALM / PERT ID)", "KB Go/No Go", "ke comments (related alm/pert id)", "ke comments (related alm / pert id)", "kb go/no go"];
+
+    for (const key in editedCells) {
+      const [rowIdxStr, header] = key.split("__");
+      const rowIdx = parseInt(rowIdxStr);
+      const value = editedCells[key];
+
+      if (mandatoryFields.some(f => f.toLowerCase() === header.toLowerCase()) && !value.trim()) {
+        toast({ title: "Validation Error", description: `Field "${header}" is mandatory at row ${rowIdx + 1}.`, variant: "destructive" });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const updatedData = currentSheet.data.map((row, i) => {
@@ -247,6 +324,12 @@ const ModelView = () => {
                 <> · Release Date: {new Date(selectedFile.release_date).toLocaleDateString()}</>
               )}
             </p> */}
+            {(kbVersion || ucidsAffected) && (
+              <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                {kbVersion && <span><strong>KB-version:</strong> {kbVersion}</span>}
+                {ucidsAffected && <span><strong>UCIDs affected:</strong> {ucidsAffected}</span>}
+              </div>
+            )}
           </div>
           {hasEdits && (
             <Button onClick={handleSaveEdits} disabled={saving}>
@@ -265,8 +348,9 @@ const ModelView = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover z-50">
-                <SelectItem value="KB Release">KB Release</SelectItem>
-                <SelectItem value="Skinny Release">Skinny Release</SelectItem>
+                <SelectItem value="PRO BUILD">PRO BUILD</SelectItem>
+                <SelectItem value="SKINNY BUILD 1">SKINNY BUILD 1</SelectItem>
+                <SelectItem value="SKINNY BUILD 2">SKINNY BUILD 2</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -320,6 +404,34 @@ const ModelView = () => {
               </Select>
             </div>
           )}
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Product Family:</label>
+            <Select value={productFamilyFilter} onValueChange={setProductFamilyFilter}>
+              <SelectTrigger className="w-48 bg-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                {productFamilyOptions.map((o) => (
+                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Scrum Lead:</label>
+            <Select value={scrumLeadFilter} onValueChange={setScrumLeadFilter}>
+              <SelectTrigger className="w-48 bg-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                {scrumLeadOptions.map((o) => (
+                  <SelectItem key={o} value={o}>{o}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Data table with editable columns */}
@@ -330,7 +442,7 @@ const ModelView = () => {
                 <thead className="sticky top-0 z-10">
                   <tr>
                     <th className="data-table-header">#</th>
-                    {currentSheet.headers.map((h) => (
+                    {displayHeaders.map((h) => (
                       <th
                         key={h}
                         className={`data-table-header whitespace-nowrap ${isEditableColumn(h) ? "bg-primary/10 text-primary" : ""}`}
@@ -342,17 +454,33 @@ const ModelView = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentSheet.data.map((row, i) => (
+                  {filteredData.map((row, i) => (
                     <tr key={i} className="hover:bg-muted/50 transition-colors">
                       <td className="data-table-cell text-muted-foreground">{i + 1}</td>
-                      {currentSheet.headers.map((h) =>
+                      {displayHeaders.map((h) =>
                         isEditableColumn(h) ? (
                           <td key={h} className="px-1 py-1 border-b border-border">
-                            <Input
-                              value={getCellValue(i, h, row[h])}
-                              onChange={(e) => handleCellEdit(i, h, e.target.value)}
-                              className="h-8 text-sm bg-primary/5 border-primary/20 focus:border-primary font-mono min-w-[200px]"
-                            />
+                            {h.toLowerCase() === "skinny validation needed" ? (
+                              <Select
+                                value={getCellValue(i, h, row[h]) || "Select"}
+                                onValueChange={(val) => handleCellEdit(i, h, val)}
+                              >
+                                <SelectTrigger className="h-8 text-sm bg-primary/5 border-primary/20 focus:border-primary min-w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover z-50">
+                                  <SelectItem value="Select">Select</SelectItem>
+                                  <SelectItem value="Yes">Yes</SelectItem>
+                                  <SelectItem value="No">No</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                value={getCellValue(i, h, row[h])}
+                                onChange={(e) => handleCellEdit(i, h, e.target.value)}
+                                className="h-8 text-sm bg-primary/5 border-primary/20 focus:border-primary font-mono min-w-[200px]"
+                              />
+                            )}
                           </td>
                         ) : (
                           <td key={h} className="data-table-cell whitespace-nowrap">

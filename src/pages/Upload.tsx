@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const MODEL_TYPES = ["BOM Diff", "AAS BOM Diff"];
 
-const BUILD_TYPES = ["KB Release", "Skinny Release"];
+const BUILD_TYPES = ["PRO BUILD", "SKINNY BUILD 1", "SKINNY BUILD 2"];
 
 const UploadPage = () => {
   const [file, setFile] = useState<File | null>(null);
